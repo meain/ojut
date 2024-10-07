@@ -1,20 +1,37 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
 	"time"
 
-	"github.com/go-audio/audio"
-	"github.com/go-audio/wav"
 	"github.com/gordonklaus/portaudio"
 )
 
 const sampleRate = 16000
 const silenceDuration = 1      // Seconds of silence to stop recording
 const noiseFloorWindow = 16000 // Samples to analyze (1 seconds)
+
+type wavHeader struct {
+	ChunkID       [4]byte
+	ChunkSize     uint32
+	Format        [4]byte
+	Subchunk1ID   [4]byte
+	Subchunk1Size uint32
+	AudioFormat   uint16
+	NumChannels   uint16
+	SampleRate    uint32
+	ByteRate      uint32
+	BlockAlign    uint16
+	BitsPerSample uint16
+	Subchunk2ID   [4]byte
+	Subchunk2Size uint32
+}
 
 func main() {
 	// Initialize PortAudio
@@ -29,21 +46,7 @@ func main() {
 	}
 	defer stream.Close()
 
-	// Open WAV file for writing
-	file, err := os.Create("output.wav")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	// WAV encoder setup
-	enc := wav.NewEncoder(file, sampleRate, 16, 1, 1)
-	buffer := &audio.IntBuffer{
-		Format: &audio.Format{SampleRate: sampleRate, NumChannels: 1},
-		Data:   []int{},
-	}
-
-	fmt.Println("Recording...")
+	fmt.Fprintf(os.Stderr, "Recording...\n")
 
 	err = stream.Start()
 	if err != nil {
@@ -51,12 +54,15 @@ func main() {
 	}
 
 	// Calculate noise floor at the beginning
-	fmt.Println("Calculating noise floor...")
+	fmt.Fprintf(os.Stderr, "Calculating noise floor...\n")
 	noiseFloor := calculateNoiseFloor(stream, in)
-	fmt.Printf("Calculated noise floor: %.4f\n", noiseFloor)
+	fmt.Fprintf(os.Stderr, "Calculated noise floor: %.4f\n", noiseFloor)
 
 	// Variables to track silence
 	silenceFrames := 0
+
+	// Buffer to store audio data
+	var audioBuffer bytes.Buffer
 
 	// Recording loop
 	for {
@@ -65,12 +71,16 @@ func main() {
 			log.Fatal(err)
 		}
 
-		buffer.Data = append(buffer.Data, convertInt16SliceToInt(in)...)
+		// Write audio data to buffer
+		err = binary.Write(&audioBuffer, binary.LittleEndian, in)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		// Check for silence based on noise floor
 		isSilent := true
 		for _, sample := range in {
-			fmt.Printf("%d %f\r", silenceFrames, math.Abs(float64(sample))/math.MaxInt16)
+			fmt.Fprintf(os.Stderr, "%d %f\r", silenceFrames, math.Abs(float64(sample))/math.MaxInt16)
 			if math.Abs(float64(sample))/math.MaxInt16 > noiseFloor*5 { // Adjust threshold multiplier
 				isSilent = false
 				break
@@ -82,10 +92,9 @@ func main() {
 		} else {
 			silenceFrames = 0
 		}
-		// fmt.Printf("Silence frames: %d\r", silenceFrames)
 
 		if silenceFrames >= int(silenceDuration*float64(sampleRate)/float64(len(in))) {
-			fmt.Println("Silence detected, stopping...")
+			fmt.Fprintf(os.Stderr, "Silence detected, stopping...\n")
 			break
 		}
 	}
@@ -95,17 +104,38 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Write to the WAV file
-	if err := enc.Write(buffer); err != nil {
+	// Create WAV header
+	header := createWAVHeader(uint32(audioBuffer.Len()))
+
+	// Write WAV header to stdout
+	err = binary.Write(os.Stdout, binary.LittleEndian, header)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Close WAV encoder
-	if err := enc.Close(); err != nil {
+	// Write audio data to stdout
+	_, err = io.Copy(os.Stdout, &audioBuffer)
+	if err != nil {
 		log.Fatal(err)
 	}
+}
 
-	fmt.Println("Recording saved to output.wav")
+func createWAVHeader(dataSize uint32) wavHeader {
+	return wavHeader{
+		ChunkID:       [4]byte{'R', 'I', 'F', 'F'},
+		ChunkSize:     36 + dataSize,
+		Format:        [4]byte{'W', 'A', 'V', 'E'},
+		Subchunk1ID:   [4]byte{'f', 'm', 't', ' '},
+		Subchunk1Size: 16,
+		AudioFormat:   1,
+		NumChannels:   1,
+		SampleRate:    sampleRate,
+		ByteRate:      sampleRate * 2,
+		BlockAlign:    2,
+		BitsPerSample: 16,
+		Subchunk2ID:   [4]byte{'d', 'a', 't', 'a'},
+		Subchunk2Size: dataSize,
+	}
 }
 
 // calculateNoiseFloor records and analyzes initial noise to calculate the average noise floor
@@ -135,12 +165,4 @@ func calculateNoiseFloor(stream *portaudio.Stream, in []int16) float64 {
 	}
 
 	return sum / float64(len(noiseSamples))
-}
-
-func convertInt16SliceToInt(s []int16) []int {
-	result := make([]int, len(s))
-	for i, v := range s {
-		result[i] = int(v)
-	}
-	return result
 }
