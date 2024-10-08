@@ -1,0 +1,2 @@
+Using it something like this along with Whisper:
+raus | whisper-cpp -m "ggml-medium.en.bin" -f - -np -nt
