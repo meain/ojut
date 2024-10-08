@@ -8,6 +8,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gordonklaus/portaudio"
 )
@@ -97,47 +99,66 @@ func recordAudioWithDynamicNoiseFloor() *bytes.Buffer {
 	var silenceCount int
 	window := make([]float64, windowSize)
 
+	// Set up signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGHUP)
+
+	// Create a channel to signal when to stop recording
+	stopChan := make(chan struct{})
+
+	// Start a goroutine to handle the SIGHUP signal
+	go func() {
+		<-sigChan
+		fmt.Fprintf(os.Stderr, "\nReceived SIGHUP, stopping recording.\n")
+		close(stopChan)
+	}()
+
 	for {
-		err = stream.Read()
-		if err != nil {
-			log.Fatal(err)
-		}
+		select {
+		case <-stopChan:
+			return audioBuffer
+		default:
+			err = stream.Read()
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		err = binary.Write(audioBuffer, binary.LittleEndian, in)
-		if err != nil {
-			log.Fatal(err)
-		}
+			err = binary.Write(audioBuffer, binary.LittleEndian, in)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		for _, sample := range in {
-			amplitude := math.Abs(float64(sample)) / math.MaxInt16
-			window[sampleCount%windowSize] = amplitude
-			sampleCount++
+			for _, sample := range in {
+				amplitude := math.Abs(float64(sample)) / math.MaxInt16
+				window[sampleCount%windowSize] = amplitude
+				sampleCount++
 
-			if sampleCount >= windowSize {
-				currentNoiseFloor := calculateAverage(window)
-				fmt.Fprintf(os.Stderr, "Current noise floor: %.4f\r", currentNoiseFloor)
+				if sampleCount >= windowSize {
+					currentNoiseFloor := calculateAverage(window)
+					fmt.Fprintf(os.Stderr, "Current noise floor: %.4f\r", currentNoiseFloor)
 
-				if !recordingStarted {
-					if currentNoiseFloor > noiseFloor*1.5 {
-						recordingStarted = true
-						maxNoiseFloor = currentNoiseFloor
-					}
-				} else {
-					if currentNoiseFloor > maxNoiseFloor {
-						maxNoiseFloor = currentNoiseFloor
-						silenceCount = 0
-					} else if currentNoiseFloor < maxNoiseFloor*0.5 {
-						silenceCount++
-						if silenceCount > 5 { // Stop after 5 consecutive low-noise windows
-							fmt.Fprintf(os.Stderr, "\nNoise level dipped, stopping recording.\n")
-							return audioBuffer
+					if !recordingStarted {
+						if currentNoiseFloor > noiseFloor*1.5 {
+							recordingStarted = true
+							maxNoiseFloor = currentNoiseFloor
 						}
 					} else {
-						silenceCount = 0
+						if currentNoiseFloor > maxNoiseFloor {
+							maxNoiseFloor = currentNoiseFloor
+							silenceCount = 0
+						} else if currentNoiseFloor < maxNoiseFloor*0.5 {
+							silenceCount++
+							if silenceCount > 5 { // Stop after 5 consecutive low-noise windows
+								fmt.Fprintf(os.Stderr, "\nNoise level dipped, stopping recording.\n")
+								return audioBuffer
+							}
+						} else {
+							silenceCount = 0
+						}
 					}
-				}
 
-				noiseFloor = currentNoiseFloor
+					noiseFloor = currentNoiseFloor
+				}
 			}
 		}
 	}
