@@ -17,6 +17,7 @@ const silenceDuration = 1      // Seconds of silence to stop recording
 const noiseFloorWindow = 16000 // Samples to analyze (1 second)
 const beepDuration = 0.15      // Duration of the beep sound in seconds
 const beepFrequency = 980      // Frequency of the beep sound in Hz (A5 note)
+const noiseFloorMultiplier = 5 // Multiplier for noise floor
 
 type wavHeader struct {
 	ChunkID       [4]byte
@@ -122,7 +123,7 @@ func recordAudio(noiseFloor float64) *bytes.Buffer {
 		isSilent := true
 		for _, sample := range in {
 			fmt.Fprintf(os.Stderr, "%d %f\r", silenceFrames, math.Abs(float64(sample))/math.MaxInt16)
-			if math.Abs(float64(sample))/math.MaxInt16 > noiseFloor*5 { // Adjust threshold multiplier
+			if math.Abs(float64(sample))/math.MaxInt16 > noiseFloor*noiseFloorMultiplier {
 				isSilent = false
 				break
 			}
