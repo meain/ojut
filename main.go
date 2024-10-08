@@ -12,12 +12,10 @@ import (
 	"github.com/gordonklaus/portaudio"
 )
 
-const sampleRate = 16000       // Increased for better audio quality
-const silenceDuration = 1      // Seconds of silence to stop recording
-const noiseFloorWindow = 16000 // Samples to analyze (1 second)
-const beepDuration = 0.15      // Duration of the beep sound in seconds
-const beepFrequency = 980      // Frequency of the beep sound in Hz (A5 note)
-const noiseFloorMultiplier = 5 // Multiplier for noise floor
+const sampleRate = 16000
+const beepDuration = 0.15
+const beepFrequency = 980
+const windowSize = 16000 // 1 second window for noise floor calculation
 
 type wavHeader struct {
 	ChunkID       [4]byte
@@ -36,36 +34,24 @@ type wavHeader struct {
 }
 
 func main() {
-	// Initialize PortAudio
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	// Generate beep sound
 	beep := generateBeep()
 
-	// Calculate noise floor
-	fmt.Fprintf(os.Stderr, "Calculating noise floor...\n")
-	// playBeep(beep)
-	noiseFloor := calculateNoiseFloor()
-	playBeep(beep)
-	fmt.Fprintf(os.Stderr, "Calculated noise floor: %.4f\n", noiseFloor)
-
-	// Start recording
 	fmt.Fprintf(os.Stderr, "Recording...\n")
-	audioBuffer := recordAudio(noiseFloor)
+	playBeep(beep)
+	audioBuffer := recordAudioWithDynamicNoiseFloor()
 	playBeep(beep)
 	fmt.Fprintf(os.Stderr, "Recording completed.\n")
 
-	// Create WAV header
 	header := createWAVHeader(uint32(audioBuffer.Len()))
 
-	// Write WAV header to stdout
 	err := binary.Write(os.Stdout, binary.LittleEndian, header)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Write audio data to stdout
 	_, err = io.Copy(os.Stdout, audioBuffer)
 	if err != nil {
 		log.Fatal(err)
@@ -90,7 +76,7 @@ func createWAVHeader(dataSize uint32) wavHeader {
 	}
 }
 
-func recordAudio(noiseFloor float64) *bytes.Buffer {
+func recordAudioWithDynamicNoiseFloor() *bytes.Buffer {
 	audioBuffer := &bytes.Buffer{}
 	in := make([]int16, 512)
 	stream, err := portaudio.OpenDefaultStream(1, 0, sampleRate, len(in), in)
@@ -104,10 +90,13 @@ func recordAudio(noiseFloor float64) *bytes.Buffer {
 		log.Fatal(err)
 	}
 
-	// Variables to track silence
-	silenceFrames := 0
+	var noiseFloor float64
+	var maxNoiseFloor float64
+	var sampleCount int
+	var recordingStarted bool
+	var silenceCount int
+	window := make([]float64, windowSize)
 
-	// Recording loop
 	for {
 		err = stream.Read()
 		if err != nil {
@@ -119,79 +108,47 @@ func recordAudio(noiseFloor float64) *bytes.Buffer {
 			log.Fatal(err)
 		}
 
-		// Check for silence based on noise floor
-		isSilent := true
 		for _, sample := range in {
-			fmt.Fprintf(os.Stderr, "%d %f\r", silenceFrames, math.Abs(float64(sample))/math.MaxInt16)
-			if math.Abs(float64(sample))/math.MaxInt16 > noiseFloor*noiseFloorMultiplier {
-				isSilent = false
-				break
+			amplitude := math.Abs(float64(sample)) / math.MaxInt16
+			window[sampleCount%windowSize] = amplitude
+			sampleCount++
+
+			if sampleCount >= windowSize {
+				currentNoiseFloor := calculateAverage(window)
+				fmt.Fprintf(os.Stderr, "Current noise floor: %.4f\r", currentNoiseFloor)
+
+				if !recordingStarted {
+					if currentNoiseFloor > noiseFloor*1.5 {
+						recordingStarted = true
+						maxNoiseFloor = currentNoiseFloor
+					}
+				} else {
+					if currentNoiseFloor > maxNoiseFloor {
+						maxNoiseFloor = currentNoiseFloor
+						silenceCount = 0
+					} else if currentNoiseFloor < maxNoiseFloor*0.5 {
+						silenceCount++
+						if silenceCount > 5 { // Stop after 5 consecutive low-noise windows
+							fmt.Fprintf(os.Stderr, "\nNoise level dipped, stopping recording.\n")
+							return audioBuffer
+						}
+					} else {
+						silenceCount = 0
+					}
+				}
+
+				noiseFloor = currentNoiseFloor
 			}
 		}
-
-		if isSilent {
-			silenceFrames++
-		} else {
-			silenceFrames = 0
-		}
-
-		if silenceFrames >= int(silenceDuration*float64(sampleRate)/float64(len(in))) {
-			fmt.Fprintf(os.Stderr, "Silence detected, stopping...\n")
-			break
-		}
 	}
-
-	err = stream.Stop()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return audioBuffer
 }
 
-func calculateNoiseFloor() float64 {
-	in := make([]int16, 512)
-	stream, err := portaudio.OpenDefaultStream(1, 0, sampleRate, len(in), in)
-	if err != nil {
-		log.Fatal(err)
+func calculateAverage(window []float64) float64 {
+	sum := 0.0
+	for _, v := range window {
+		sum += v
 	}
-	defer stream.Close()
-
-	err = stream.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	noiseSamples := make([]float64, noiseFloorWindow)
-	sampleCount := 0
-
-	for sampleCount < noiseFloorWindow {
-		err := stream.Read()
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, sample := range in {
-			if sampleCount < noiseFloorWindow {
-				noiseSamples[sampleCount] = math.Abs(float64(sample)) / math.MaxInt16
-				sampleCount++
-			} else {
-				break
-			}
-		}
-	}
-
-	err = stream.Stop()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Calculate the average amplitude of the noise window
-	var sum float64
-	for _, sample := range noiseSamples {
-		sum += sample
-	}
-
-	return sum / float64(len(noiseSamples))
+	return sum / float64(len(window))
 }
 
 func generateBeep() []float32 {
