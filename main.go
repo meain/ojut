@@ -17,7 +17,7 @@ import (
 const sampleRate = 16000
 const beepDuration = 0.15
 const beepFrequency = 980
-const windowSize = 16000 // 1 second window for noise floor calculation
+const windowSize = 2 * 16000 // 2 second window for noise floor calculation
 
 type wavHeader struct {
 	ChunkID       [4]byte
