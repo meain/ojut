@@ -15,8 +15,7 @@ import (
 )
 
 const sampleRate = 16000
-const beepDuration = 0.15
-const beepFrequency = 980
+const beepDuration = 0.10
 const windowSize = 2 * 16000 // 2 second window for noise floor calculation
 
 type wavHeader struct {
@@ -39,12 +38,10 @@ func main() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	beep := generateBeep()
-
 	fmt.Fprintf(os.Stderr, "Recording...\n")
-	playBeep(beep)
+	playBeep(generateBeep(1700), 80)
 	audioBuffer := recordAudioWithDynamicNoiseFloor()
-	playBeep(beep)
+	playBeep(generateBeep(1200), 80)
 	fmt.Fprintf(os.Stderr, "Recording completed.\n")
 
 	header := createWAVHeader(uint32(audioBuffer.Len()))
@@ -172,7 +169,7 @@ func calculateAverage(window []float64) float64 {
 	return sum / float64(len(window))
 }
 
-func generateBeep() []float32 {
+func generateBeep(freq int) []float32 {
 	beepSamples := int(beepDuration * sampleRate)
 	beep := make([]float32, beepSamples)
 
@@ -180,13 +177,18 @@ func generateBeep() []float32 {
 		t := float64(i) / sampleRate
 		// Apply a sine wave envelope for a smoother sound
 		envelope := math.Sin(math.Pi * t / beepDuration)
-		beep[i] = float32(math.Sin(2*math.Pi*beepFrequency*t) * envelope * 0.5)
+		beep[i] = float32(math.Sin(2*math.Pi*float64(freq)*t) * envelope * 0.5)
 	}
 
 	return beep
 }
 
-func playBeep(beep []float32) {
+func playBeep(beep []float32, volume float32) {
+	// Adjusting the beep slice for 50% volume
+	for i := range beep {
+		beep[i] *= volume / 100
+	}
+
 	stream, err := portaudio.OpenDefaultStream(0, 1, sampleRate, len(beep), &beep)
 	if err != nil {
 		log.Fatal(err)
