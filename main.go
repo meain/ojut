@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
+	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
+
+	"golang.design/x/hotkey"
+	"golang.design/x/hotkey/mainthread"
 
 	"github.com/gordonklaus/portaudio"
 )
@@ -34,26 +38,64 @@ type wavHeader struct {
 	Subchunk2Size uint32
 }
 
-func main() {
+func main() { mainthread.Init(fn) }
+func fn() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	fmt.Fprintf(os.Stderr, "Recording...\n")
-	playBeep(generateBeep(1700), 80)
-	audioBuffer := recordAudioWithDynamicNoiseFloor()
-	playBeep(generateBeep(1200), 80)
-	fmt.Fprintf(os.Stderr, "Recording completed.\n")
-
-	header := createWAVHeader(uint32(audioBuffer.Len()))
-
-	err := binary.Write(os.Stdout, binary.LittleEndian, header)
+	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModOption, hotkey.ModCmd}, hotkey.KeyP)
+	err := hk.Register()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("hotkey: failed to register hotkey: %v", err)
+		return
 	}
 
-	_, err = io.Copy(os.Stdout, audioBuffer)
-	if err != nil {
-		log.Fatal(err)
+	defer hk.Unregister()
+	fmt.Println("[RAUS is Ready]")
+
+	for {
+		<-hk.Keydown()
+		fmt.Fprintf(os.Stderr, "Recording...\r")
+		audioBuffer := recordAudioWithDynamicNoiseFloor(hk.Keyup(), false)
+		fmt.Fprintf(os.Stderr, "Processing...\r")
+
+		var combinedBuffer bytes.Buffer
+		header := createWAVHeader(uint32(audioBuffer.Len()))
+
+		err := binary.Write(&combinedBuffer, binary.LittleEndian, header)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = combinedBuffer.ReadFrom(audioBuffer)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cmd := exec.Command("whisper-cpp", "-m", "ggml-medium.en.bin", "-f", "-", "-np", "-nt")
+		cmd.Stdin = &combinedBuffer
+
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+
+		err = cmd.Start()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", err)
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", err)
+		}
+
+		// Clear line before printing
+		fmt.Fprintf(os.Stderr, "\x1b[2K\r")
+		fmt.Println(strings.TrimSpace(out.String()))
+		if cmd.Err != nil {
+			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", stderr.String())
+		}
 	}
 }
 
@@ -75,7 +117,7 @@ func createWAVHeader(dataSize uint32) wavHeader {
 	}
 }
 
-func recordAudioWithDynamicNoiseFloor() *bytes.Buffer {
+func recordAudioWithDynamicNoiseFloor(cancel <-chan hotkey.Event, cancelOnSilence bool) *bytes.Buffer {
 	audioBuffer := &bytes.Buffer{}
 	in := make([]int16, 512)
 	stream, err := portaudio.OpenDefaultStream(1, 0, sampleRate, len(in), in)
@@ -113,6 +155,10 @@ func recordAudioWithDynamicNoiseFloor() *bytes.Buffer {
 	for {
 		select {
 		case <-stopChan:
+			if cancelOnSilence {
+				return audioBuffer
+			}
+		case <-cancel:
 			return audioBuffer
 		default:
 			err = stream.Read()

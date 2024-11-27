@@ -24,6 +24,7 @@
 
             pkg-config
             portaudio
+	    darwin.apple_sdk.frameworks.Cocoa
 
             # development
             openai-whisper-cpp
