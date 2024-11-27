@@ -12,10 +12,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/gordonklaus/portaudio"
+	"github.com/micmonay/keybd_event"
 	"golang.design/x/hotkey"
 	"golang.design/x/hotkey/mainthread"
-
-	"github.com/gordonklaus/portaudio"
 )
 
 const sampleRate = 16000
@@ -48,6 +48,11 @@ func fn() {
 	if err != nil {
 		log.Fatalf("hotkey: failed to register hotkey: %v", err)
 		return
+	}
+
+	kb, err := keybd_event.NewKeyBonding()
+	if err != nil {
+		panic(err)
 	}
 
 	defer hk.Unregister()
@@ -95,6 +100,11 @@ func fn() {
 		fmt.Println(strings.TrimSpace(out.String()))
 		if cmd.Err != nil {
 			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", stderr.String())
+		}
+
+		err = typeString(strings.TrimSpace(out.String()), kb)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to type: %s\n", err)
 		}
 	}
 }
