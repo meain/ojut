@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/manifoldco/promptui"
@@ -37,11 +38,28 @@ func selectModel() (string, error) {
 	}
 
 	pKeys := []string{}
+	files, err := os.ReadDir(cacheFolder)
+	if err != nil {
+		return "", err
+	}
+	cachedModels := make(map[string]struct{})
+
+	for _, file := range files {
+		cachedModels[strings.TrimSuffix(file.Name(), ".bin")] = struct{}{}
+	}
+
 	for key := range models {
-		pKeys = append(pKeys, fmt.Sprintf("%s [%s]", key, models[key].Size))
+		marker := ""
+		if _, found := cachedModels[key]; found {
+			marker = " [cached]"
+		}
+		pKeys = append(pKeys, fmt.Sprintf("%s [%s]%s", key, models[key].Size, marker))
 	}
 
 	slices.Sort(pKeys)
+	sort.Slice(pKeys, func(i, j int) bool {
+		return strings.Contains(pKeys[i], "[cached]") && !strings.Contains(pKeys[j], "[cached]")
+	})
 
 	prompt := promptui.Select{
 		Label:        "Select model",
