@@ -1,50 +1,23 @@
-# RAUS
+# Woosh
 
-**Record Audio Until Silence**
+**Voice transcription using Whisper models.**
 
-Here is how I use it with Hammerspon to enable Whisper based transcription to type.
+## Usage
 
-``` lua
-function transcribeAudio()
-    local task = hs.task.new("/bin/sh", function(exitCode, output, stdErr)
-        if exitCode ~= 0 then
-            hs.alert.show("Transcription failed: " .. (stdErr or "Unknown error"))
-            return
-        end
+Once you have the woosh server running in the background, here is what
+a sample workflow would look like:
 
-        output = utils.trim(output)
+- Focus on the input field you want to type in
+- Press the trigger key (currently ctrl+alt+cmd+u)
+- Wait for audio cue
+- Start speaking
+- Release the trigger key
+- Text gets typed out into the input field
 
-        if output == "." then
-            -- Just stopped previous one
-            return
-        elseif output == "" then
-            hs.alert.show("Speak up")
-        else
-            hs.eventtap.keyStrokes(output)
-        end
-    end, {"-c", ",transcribe-audio"})
+## Installation
 
-    task:start()
-end
+> You also could run via the nix flake using `nix run gh:meain/woosh`
 
-hs.hotkey.bind(fkey, ";", transcribeAudio)
-```
-
-Here is the ,transcribe-audio script:
-
-``` shell
-#!/bin/sh
-
-set -e
-
-if pgrep -x "raus" > /dev/null; then
-    kill -s HUP $(pgrep -x "raus")
-    echo .
-    exit
-fi
-
-raus |
-    whisper-cpp -m "$HOME/dev/src/record-audio-until-silence/ggml-medium.en.bin" -f - -np -nt |
-    tr -d '\n' |
-    sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
-```
+- Install portaudio
+- Install whisper-cpp (need to be available in path)
+- Install woosh (go install github.com/meain/woosh@latest)

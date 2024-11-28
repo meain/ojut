@@ -1,6 +1,9 @@
-// Pending
-// - Pipe output to model as we speak
-// - Add some audio cue to let folks know we are recording
+// TODO
+// - Option to download model from within (currently hardcoded)
+// - Pipe output to model as we speak (whisper streaming)
+// - Maybe a UI
+// - Maybe a way to track all the recordings so far (not sure what the use is)
+
 package main
 
 import (
@@ -62,7 +65,7 @@ func fn() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
-	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModOption, hotkey.ModCmd}, hotkey.KeyP)
+	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModOption, hotkey.ModCmd}, hotkey.KeyU)
 	err = hk.Register()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to register hotkey\n")
@@ -76,7 +79,7 @@ func fn() {
 	}
 
 	defer hk.Unregister()
-	fmt.Println("[RAUS is Ready]")
+	fmt.Println("[Woosh is Ready]")
 
 	for {
 		<-hk.Keydown()
@@ -120,14 +123,22 @@ func fn() {
 			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", err)
 		}
 
+		text := strings.TrimSpace(out.String())
+
 		// Clear line before printing
 		fmt.Fprintf(os.Stderr, "\x1b[2K\r")
-		fmt.Println(strings.TrimSpace(out.String()))
+		fmt.Println(text)
 		if cmd.Err != nil {
 			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", stderr.String())
 		}
 
-		err = typeString(strings.TrimSpace(out.String()), kb)
+		// This is how whisper represents blank audio. Skip it, it
+		// there is nothing.
+		if text == "[BLANK_AUDIO]" {
+			continue
+		}
+
+		err = typeString(text, kb)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to type: %s\n", err)
 		}

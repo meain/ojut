@@ -9,30 +9,44 @@
       {
         packages = rec {
           default = pkgs.buildGoModule {
-            pname = "name";
+            pname = "woosh";
             version = "dev";
             src = ./.;
-            vendorHash = "";
+            vendorHash = "sha256-TFI8h8wAA4OcchOpLICFbpsZ5SVhrQJ2FAzbj1Q3iyM=";
             doCheck = false;
+
+            nativeBuildInputs = [
+              pkgs.pkg-config
+            ];
+
+            buildInputs = [
+              pkgs.portaudio
+              pkgs.openai-whisper-cpp
+            ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+              pkgs.darwin.apple_sdk.frameworks.Cocoa
+            ];
+
+            meta = with pkgs.lib; {
+              description = "Voice transcription using Whisper models";
+              homepage = "https://github.com/meain/woosh";
+              license = licenses.asl20;
+              maintainers = with maintainers; [ meain ];
+              mainProgram = "woosh";
+            };
           };
         };
 
         devShells.default = pkgs.mkShell {
           hardeningDisable = [ "fortify" ];
           packages = with pkgs; [
-            go
-
+            openai-whisper-cpp
             pkg-config
             portaudio
-	    darwin.apple_sdk.frameworks.Cocoa
+            darwin.apple_sdk.frameworks.Cocoa
 
             # development
-            openai-whisper-cpp
-
-            # linters
+            go
             gofumpt
-
-            # debugging
             delve
           ];
         };

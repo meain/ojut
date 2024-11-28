@@ -1,3 +1,4 @@
 *.bin
 *.wav
 *.mp3
+/result

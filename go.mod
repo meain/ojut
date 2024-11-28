@@ -1,4 +1,4 @@
-module github.com/meain/raus
+module github.com/meain/woosh
 
 go 1.22.7
 
