@@ -62,19 +62,25 @@ func fn() {
 		return
 	}
 
+	modelFile, err := selectModel()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to pick model: %s\n", err)
+		return
+	}
+
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
 	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModOption, hotkey.ModCmd}, hotkey.KeyU)
 	err = hk.Register()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to register hotkey\n")
+		fmt.Fprintf(os.Stderr, "Unable to register hotkey: %s\n", err)
 		return
 	}
 
 	kb, err := keybd_event.NewKeyBonding()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to register keyboard input\n")
+		fmt.Fprintf(os.Stderr, "Unable to register keyboard input: %s\n", err)
 		return
 	}
 
@@ -105,7 +111,7 @@ func fn() {
 			log.Fatal(err)
 		}
 
-		cmd := exec.Command("whisper-cpp", "-m", "ggml-medium.en.bin", "-f", "-", "-np", "-nt")
+		cmd := exec.Command(whisperBinary, "-m", modelFile, "-f", "-", "-np", "-nt")
 		cmd.Stdin = &combinedBuffer
 
 		var out bytes.Buffer
@@ -115,12 +121,13 @@ func fn() {
 
 		err = cmd.Start()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to start audio processing: %s\n", err)
 		}
 
 		err = cmd.Wait()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed processing audio: %s\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to process audio: %s\n", err)
+			fmt.Println(stderr.String())
 		}
 
 		text := strings.TrimSpace(out.String())
