@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -30,6 +31,9 @@ const windowSize = 2 * 16000 // 2 second window for noise floor calculation
 const whisperBinary = "whisper-cpp"
 
 var mu sync.Mutex
+
+//go:embed tap.mp3
+var tapAudio []byte
 
 type wavHeader struct {
 	ChunkID       [4]byte
@@ -76,12 +80,12 @@ func fn() {
 
 	for {
 		<-hk.Keydown()
-		go playAudio("tap.mp3")
+		go playAudio()
 
 		fmt.Fprintf(os.Stderr, "Recording...\r")
 		audioBuffer := recordAudioWithDynamicNoiseFloor(hk.Keyup(), false)
 
-		go playAudio("tap.mp3")
+		go playAudio()
 		// Clear needed here as we print out noise floor data
 		fmt.Fprintf(os.Stderr, "\x1b[2K\r"+"Processing...\r")
 
@@ -246,14 +250,8 @@ func calculateAverage(window []float64) float64 {
 	return sum / float64(len(window))
 }
 
-func playAudio(filename string) error {
-	f, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	d, err := mp3.NewDecoder(f)
+func playAudio() error {
+	d, err := mp3.NewDecoder(bytes.NewReader(tapAudio))
 	if err != nil {
 		return err
 	}
