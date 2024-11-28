@@ -1,26 +1,35 @@
+// Pending
+// - Pipe output to model as we speak
+// - Add some audio cue to let folks know we are recording
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/gordonklaus/portaudio"
+	"github.com/hajimehoshi/go-mp3"
+	"github.com/hajimehoshi/oto"
 	"github.com/micmonay/keybd_event"
 	"golang.design/x/hotkey"
 	"golang.design/x/hotkey/mainthread"
 )
 
-const sampleRate = 16000
-const beepDuration = 0.10
+const sampleRate = 16000     // needed for whisper
 const windowSize = 2 * 16000 // 2 second window for noise floor calculation
+const whisperBinary = "whisper-cpp"
+
+var mu sync.Mutex
 
 type wavHeader struct {
 	ChunkID       [4]byte
@@ -40,19 +49,26 @@ type wavHeader struct {
 
 func main() { mainthread.Init(fn) }
 func fn() {
+	_, err := exec.LookPath(whisperBinary)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to find binary '%s'\n", whisperBinary)
+		return
+	}
+
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 
 	hk := hotkey.New([]hotkey.Modifier{hotkey.ModCtrl, hotkey.ModOption, hotkey.ModCmd}, hotkey.KeyP)
-	err := hk.Register()
+	err = hk.Register()
 	if err != nil {
-		log.Fatalf("hotkey: failed to register hotkey: %v", err)
+		fmt.Fprintf(os.Stderr, "Unable to register hotkey\n")
 		return
 	}
 
 	kb, err := keybd_event.NewKeyBonding()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Unable to register keyboard input\n")
+		return
 	}
 
 	defer hk.Unregister()
@@ -60,9 +76,14 @@ func fn() {
 
 	for {
 		<-hk.Keydown()
+		go playAudio("tap.mp3")
+
 		fmt.Fprintf(os.Stderr, "Recording...\r")
 		audioBuffer := recordAudioWithDynamicNoiseFloor(hk.Keyup(), false)
-		fmt.Fprintf(os.Stderr, "Processing...\r")
+
+		go playAudio("tap.mp3")
+		// Clear needed here as we print out noise floor data
+		fmt.Fprintf(os.Stderr, "\x1b[2K\r"+"Processing...\r")
 
 		var combinedBuffer bytes.Buffer
 		header := createWAVHeader(uint32(audioBuffer.Len()))
@@ -225,44 +246,35 @@ func calculateAverage(window []float64) float64 {
 	return sum / float64(len(window))
 }
 
-func generateBeep(freq int) []float32 {
-	beepSamples := int(beepDuration * sampleRate)
-	beep := make([]float32, beepSamples)
-
-	for i := range beep {
-		t := float64(i) / sampleRate
-		// Apply a sine wave envelope for a smoother sound
-		envelope := math.Sin(math.Pi * t / beepDuration)
-		beep[i] = float32(math.Sin(2*math.Pi*float64(freq)*t) * envelope * 0.5)
-	}
-
-	return beep
-}
-
-func playBeep(beep []float32, volume float32) {
-	// Adjusting the beep slice for 50% volume
-	for i := range beep {
-		beep[i] *= volume / 100
-	}
-
-	stream, err := portaudio.OpenDefaultStream(0, 1, sampleRate, len(beep), &beep)
+func playAudio(filename string) error {
+	f, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	defer stream.Close()
+	defer f.Close()
 
-	err = stream.Start()
+	d, err := mp3.NewDecoder(f)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = stream.Write()
-	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	err = stream.Stop()
+	// We can only have one context at any time. This is a quick hack
+	// to deal with this limitation. The audio is small enough that it
+	// should not matter in most cases.
+	mu.Lock()
+	defer mu.Unlock()
+
+	c, err := oto.NewContext(d.SampleRate(), 2, 2, 8192)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	defer c.Close()
+
+	p := c.NewPlayer()
+	defer p.Close()
+
+	if _, err := io.Copy(p, d); err != nil {
+		return err
+	}
+	return nil
 }
