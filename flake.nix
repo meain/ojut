@@ -12,7 +12,7 @@
             pname = "woosh";
             version = "dev";
             src = ./.;
-            vendorHash = "sha256-TFI8h8wAA4OcchOpLICFbpsZ5SVhrQJ2FAzbj1Q3iyM=";
+            vendorHash = "sha256-t8ZFR30WKlwbGpVnjvFD1XY+Uj4QL2zqD2/fpS96jn0=";
             doCheck = false;
 
             nativeBuildInputs = [

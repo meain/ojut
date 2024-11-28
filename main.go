@@ -3,6 +3,7 @@
 // - Pipe output to model as we speak (whisper streaming)
 // - Maybe a UI
 // - Maybe a way to track all the recordings so far (not sure what the use is)
+// - Ability to set config (default model and keybinding)
 
 package main
 
