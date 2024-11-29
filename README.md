@@ -1,6 +1,6 @@
 # Ojut
 
-**Voice transcription using Whisper models.**
+**Voice dictation using Whisper models.**
 
 ## Usage
 
