@@ -3,6 +3,7 @@ package main
 import (
 	"unicode"
 
+	"github.com/atotto/clipboard"
 	"github.com/micmonay/keybd_event"
 )
 
@@ -116,4 +117,38 @@ func getKeyCode(char rune) (int, bool) {
 
 	// Unsupported character
 	return -1, false
+}
+
+// pasteString is an alternative to typing the string. Typing uses
+// actual keystrokes which could cause issue if we are not in a text
+// field or if we have random control keys pressed down.
+func pasteString(str string, kb keybd_event.KeyBonding) error {
+	// Store the current clipboard content
+	currentContent, err := clipboard.ReadAll()
+	if err != nil {
+		return err
+	}
+
+	// Write the new string to the clipboard
+	err = clipboard.WriteAll(str)
+	if err != nil {
+		return err
+	}
+
+	// Paste the new string
+	kb.SetKeys(keybd_event.VK_V)
+	kb.HasSuper(true)
+	err = kb.Launching()
+	if err != nil {
+		return err
+	}
+
+	// Restore the original clipboard content
+	// Looks like if you do this fast enough clipboard managers don't get to store it
+	err = clipboard.WriteAll(currentContent)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

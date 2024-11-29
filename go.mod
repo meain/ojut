@@ -3,6 +3,7 @@ module github.com/meain/woosh
 go 1.22.7
 
 require (
+	github.com/atotto/clipboard v0.1.4
 	github.com/gordonklaus/portaudio v0.0.0-20230709114228-aafa478834f5
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/hajimehoshi/oto v1.0.1

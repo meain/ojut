@@ -146,7 +146,8 @@ func fn() {
 			continue
 		}
 
-		err = typeString(text, kb)
+		// err = typeString(text, kb)
+		err = pasteString(text, kb)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to type: %s\n", err)
 		}
