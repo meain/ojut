@@ -9,7 +9,7 @@
       {
         packages = rec {
           default = pkgs.buildGoModule {
-            pname = "woosh";
+            pname = "ojut";
             version = "dev";
             src = ./.;
             vendorHash = "sha256-t8ZFR30WKlwbGpVnjvFD1XY+Uj4QL2zqD2/fpS96jn0=";
@@ -28,10 +28,10 @@
 
             meta = with pkgs.lib; {
               description = "Voice transcription using Whisper models";
-              homepage = "https://github.com/meain/woosh";
+              homepage = "https://github.com/meain/ojut";
               license = licenses.asl20;
               maintainers = with maintainers; [ meain ];
-              mainProgram = "woosh";
+              mainProgram = "ojut";
             };
           };
         };

@@ -1,10 +1,10 @@
-# Woosh
+# Ojut
 
 **Voice transcription using Whisper models.**
 
 ## Usage
 
-Once you have the woosh server running in the background, here is what
+Once you have the ojut server running in the background, here is what
 a sample workflow would look like:
 
 - Focus on the input field you want to type in
@@ -16,8 +16,16 @@ a sample workflow would look like:
 
 ## Installation
 
-> You also could run via the nix flake using `nix run gh:meain/woosh`
+> You also could run via the nix flake using `nix run gh:meain/ojut`
 
 - Install portaudio
 - Install whisper-cpp (need to be available in path)
-- Install woosh (go install github.com/meain/woosh@latest)
+- Install ojut (go install github.com/meain/ojut@latest)
+
+## What is with the name?
+
+I'm glad you asked. It's very stupid but here is how I got to the
+name. "Dictation" in Japanese is "口述筆記" which sounds like "Kōjutsu
+hikki". Now I just took part of the first word "ojut". It was unique
+enough and I was tired of looking for the name and so I decided I'm
+just going to use it.

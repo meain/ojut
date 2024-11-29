@@ -28,7 +28,7 @@ var modelsJSON []byte
 // What about tdrz models?
 const downloadURLFormat = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-%s.bin"
 
-var cacheFolder = filepath.Join(os.Getenv("HOME"), ".cache", "woosh", "models")
+var cacheFolder = filepath.Join(os.Getenv("HOME"), ".cache", "ojut", "models")
 
 func selectModel() (string, error) {
 	var models map[string]modelInfo

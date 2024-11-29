@@ -1,4 +1,4 @@
-module github.com/meain/woosh
+module github.com/meain/ojut
 
 go 1.22.7
 

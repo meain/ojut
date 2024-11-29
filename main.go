@@ -86,7 +86,7 @@ func fn() {
 	}
 
 	defer hk.Unregister()
-	fmt.Println("[Woosh is Ready]")
+	fmt.Println("[Ojut is Ready]")
 
 	for {
 		<-hk.Keydown()
