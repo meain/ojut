@@ -209,9 +209,7 @@ func recordAudioWithDynamicNoiseFloor(cancel <-chan hotkey.Event, cancelOnSilenc
 	for {
 		select {
 		case <-stopChan:
-			if cancelOnSilence {
-				return audioBuffer
-			}
+			return audioBuffer
 		case <-cancel:
 			return audioBuffer
 		default:
@@ -223,6 +221,12 @@ func recordAudioWithDynamicNoiseFloor(cancel <-chan hotkey.Event, cancelOnSilenc
 			err = binary.Write(audioBuffer, binary.LittleEndian, in)
 			if err != nil {
 				log.Fatal(err)
+			}
+
+			// We have to do the following computation only if we have
+			// to break on silence
+			if !cancelOnSilence {
+				continue
 			}
 
 			for _, sample := range in {
