@@ -31,21 +31,24 @@ const downloadURLFormat = "https://huggingface.co/ggerganov/whisper.cpp/resolve/
 var cacheFolder = filepath.Join(os.Getenv("HOME"), ".cache", "ojut", "models")
 
 func selectModel() (string, error) {
+	pKeys := []string{}
+	cachedModels := make(map[string]struct{})
+
 	var models map[string]modelInfo
 	err := json.Unmarshal(modelsJSON, &models)
 	if err != nil {
 		return "", err
 	}
 
-	pKeys := []string{}
-	files, err := os.ReadDir(cacheFolder)
-	if err != nil {
-		return "", err
-	}
-	cachedModels := make(map[string]struct{})
+	if _, err := os.Stat(cacheFolder); err == nil {
+		files, err := os.ReadDir(cacheFolder)
+		if err != nil {
+			return "", err
+		}
 
-	for _, file := range files {
-		cachedModels[strings.TrimSuffix(file.Name(), ".bin")] = struct{}{}
+		for _, file := range files {
+			cachedModels[strings.TrimSuffix(file.Name(), ".bin")] = struct{}{}
+		}
 	}
 
 	for key := range models {
