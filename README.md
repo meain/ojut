@@ -16,7 +16,7 @@ a sample workflow would look like:
 
 ## Installation
 
-> You also could run via the nix flake using `nix run gh:meain/ojut`
+> You also could run via the nix flake using `nix run github:meain/ojut`
 
 - Install portaudio
 - Install whisper-cpp (need to be available in path)
