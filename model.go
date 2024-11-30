@@ -82,6 +82,7 @@ func selectModel() (string, error) {
 func downloadModel(model string) (string, error) {
 	url := fmt.Sprintf(downloadURLFormat, model)
 	modelFilePath := filepath.Join(cacheFolder, fmt.Sprintf("%s.bin", model))
+	tempFilePath := filepath.Join(os.TempDir(), fmt.Sprintf("%s.tmp", model))
 
 	if _, err := os.Stat(modelFilePath); err == nil {
 		return modelFilePath, nil
@@ -102,7 +103,7 @@ func downloadModel(model string) (string, error) {
 		return "", err
 	}
 
-	outFile, err := os.Create(modelFilePath)
+	outFile, err := os.Create(tempFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -113,6 +114,12 @@ func downloadModel(model string) (string, error) {
 
 	// Copy the response body to the file with a progress bar
 	_, err = io.Copy(io.MultiWriter(outFile, bar), response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Move the temp file to the final destination
+	err = os.Rename(tempFilePath, modelFilePath)
 	if err != nil {
 		return "", err
 	}
