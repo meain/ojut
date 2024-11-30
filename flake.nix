@@ -12,7 +12,7 @@
             pname = "ojut";
             version = "dev";
             src = ./.;
-            vendorHash = "sha256-xhAEBECtfjzzBddoBvlqOPr1toZMDw/tQ1TWDHfgbYM=";
+            vendorHash = "sha256-IRTaBF52jQ0nxkJt8J4mCaIht8Iq16+x7mKTbghOt7k=";
             doCheck = false;
 
             nativeBuildInputs = [
