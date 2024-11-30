@@ -13,6 +13,7 @@ import (
 
 	"github.com/manifoldco/promptui"
 	"github.com/schollz/progressbar/v3"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -30,7 +31,7 @@ const downloadURLFormat = "https://huggingface.co/ggerganov/whisper.cpp/resolve/
 
 var cacheFolder = filepath.Join(os.Getenv("HOME"), ".cache", "ojut", "models")
 
-func selectModel() (string, error) {
+func selectModel(modelName string) (string, error) {
 	pKeys := []string{}
 	cachedModels := make(map[string]struct{})
 
@@ -64,19 +65,25 @@ func selectModel() (string, error) {
 		return strings.Contains(pKeys[i], "[cached]") && !strings.Contains(pKeys[j], "[cached]")
 	})
 
-	prompt := promptui.Select{
-		Label:        "Select model",
-		Items:        pKeys,
-		HideSelected: true,
+	if len(modelName) != 0 {
+		if slices.Contains(maps.Keys(models), modelName) {
+			return downloadModel(modelName)
+		}
+
+		return "", fmt.Errorf("no model with name %s", modelName)
+	} else {
+		prompt := promptui.Select{
+			Label:        "Select model",
+			Items:        pKeys,
+			HideSelected: true,
+		}
+
+		_, result, err := prompt.Run()
+		if err != nil {
+			return "", err
+		}
+		return downloadModel(strings.Split(result, " ")[0])
 	}
-
-	_, result, err := prompt.Run()
-
-	if err != nil {
-		return "", err
-	}
-
-	return downloadModel(strings.Split(result, " ")[0])
 }
 
 func downloadModel(model string) (string, error) {

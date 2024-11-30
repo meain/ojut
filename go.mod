@@ -12,6 +12,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.17.1
 	golang.design/x/hotkey v0.4.1
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
