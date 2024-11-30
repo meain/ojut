@@ -14,6 +14,26 @@ a sample workflow would look like:
 - Release the trigger key
 - Text gets typed out into the input field
 
+## Configuration
+
+You can specify the whisper model to use. This can be done via either the config
+file or using CLI args. CLI args will override the value in the config file. We
+currently only have support to specify the model, but will add more options in
+the future.
+
+Here is what the config file looks like:
+```yaml
+model: "medium.en-q8_0" # use "tiny.en-q8_0" if you have a slow machine
+```
+
+Here is how you would specify using the CLI:
+
+```sh
+ojut -model tiny.en-q8_0
+```
+
+_You can specify model as empty `ojut -model ""` to show a picker._
+
 ## Installation
 
 > You also could run via the nix flake using `nix run github:meain/ojut`
