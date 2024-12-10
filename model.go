@@ -70,6 +70,12 @@ func selectModel(modelName string) (string, error) {
 			return downloadModel(modelName)
 		}
 
+		// If the model is not found, assume this is a model path and
+		// look up the path
+		if _, err := os.Stat(modelName); err == nil {
+			return modelName, nil
+		}
+
 		return "", fmt.Errorf("no model with name %s", modelName)
 	} else {
 		prompt := promptui.Select{
