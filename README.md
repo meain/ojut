@@ -21,7 +21,21 @@ file or using CLI args. CLI args will override the value in the config file. We
 currently only have support to specify the model, but will add more options in
 the future.
 
+### Dictionary
+
+You can also specify a personal dictionary in the config file. This is a list of words that are specific to you. Ojut will prompt the model to recognize these words. Here is an example of what that would look like:
+
+```yaml
+dictionary:
+  - Ojut
+  - Golang
+  - meain
+```
+
+Note that you have to restart the server for this to take effect.
+
 Here is what the config file looks like:
+
 ```yaml
 model: "medium.en-q8_0" # use "tiny.en-q8_0" if you have a slow machine
 ```
@@ -31,6 +45,14 @@ Here is how you would specify using the CLI:
 ```sh
 ojut -model tiny.en-q8_0
 ```
+
+You can also pass in an absolute path to a model file:
+
+```
+ojut -model "/path/to/models/tiny.en.bin"
+```
+
+FYI, the [models](https://keyboard.futo.org/voice-input-models) used in [FUTO keyboard](https://keyboard.futo.org/) seems to be pretty good.
 
 _You can specify model as empty `ojut -model ""` to show a picker._
 
