@@ -29,8 +29,12 @@ const windowSize = 2 * 16000 // 2 second window for noise floor calculation
 const whisperBinary = "whisper-cpp"
 
 type Config struct {
-	// Name of the whisper model to use (TODO: optionally pass in any model)
+	// Name of the whisper model to use
 	Model string `yaml:"model" json:"model"`
+
+	// Your personal dictionary. This will be fed in as the initial
+	// prompt comma separated to force the model to use these words.
+	Dictionary []string `yaml:"dictionary" json:"dictionary"`
 }
 
 func readConfigFromFile(filePath string) (*Config, error) {
@@ -64,11 +68,22 @@ func readConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func overrideConfigWithCLIArgs(config *Config) {
+func overrideConfigWithCLIArgs(config *Config) *Config {
+	// Create a new Config to hold the CLI arguments
+	cliConfig := &Config{}
+
 	flag.StringVar(
-		&config.Model, "model",
-		config.Model, "Name of the whisper model to use")
+		&cliConfig.Model, "model",
+		"", "Name of the whisper model to use")
+
 	flag.Parse()
+
+	// Override config with CLI args only if they are set
+	if cliConfig.Model != "" {
+		config.Model = cliConfig.Model
+	}
+
+	return config
 }
 
 func main() { mainthread.Init(fn) }
@@ -91,7 +106,7 @@ func fn() {
 	if config == nil {
 		config = &Config{}
 	}
-	overrideConfigWithCLIArgs(config)
+	config = overrideConfigWithCLIArgs(config)
 
 	modelFile, err := selectModel(config.Model)
 	if err != nil {
@@ -120,13 +135,13 @@ func fn() {
 	fmt.Println("Model:", strings.TrimSuffix(filepath.Base(modelFile), ".bin"))
 
 	for {
-		if err := runLoop(modelFile, hk, kb); err != nil {
+		if err := runLoop(config, hk, kb); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func runLoop(modelFile string, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error {
+func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error {
 	<-hk.Keydown()
 	go playAudio()
 
@@ -136,6 +151,8 @@ func runLoop(modelFile string, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) err
 	go playAudio()
 	// Clear needed here as we print out noise floor data
 	fmt.Fprintf(os.Stderr, "\x1b[2K\r"+"Processing...\r")
+
+	initialPrompt := strings.Join(config.Dictionary, ", ")
 
 	var combinedBuffer bytes.Buffer
 	header := createWAVHeader(uint32(audioBuffer.Len()))
@@ -150,7 +167,16 @@ func runLoop(modelFile string, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) err
 		return err
 	}
 
-	cmd := exec.Command(whisperBinary, "-m", modelFile, "-f", "-", "-np", "-nt")
+	cmd := exec.Command(
+		whisperBinary,
+		"-m",
+		config.Model,
+		"-f",
+		"-",
+		"-np",
+		"-nt",
+		"--prompt",
+		initialPrompt)
 	cmd.Stdin = &combinedBuffer
 
 	var out bytes.Buffer
