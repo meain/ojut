@@ -21,6 +21,54 @@ file or using CLI args. CLI args will override the value in the config file. We
 currently only have support to specify the model, but will add more options in
 the future.
 
+### LLM Post-Processing
+
+Ojut can optionally post-process transcribed text using an LLM for
+better formatting and punctuation. This feature requires:
+
+1. Setting up API credentials:
+   ```sh
+   export OJUT_LLM_API_KEY="your-api-key"  # or use OPENAI_API_KEY
+   ```
+
+2. Enabling in config or CLI:
+   ```yaml
+   post_process: true
+   llm_system_prompt: "Cleanup the following transcript and add punctuation. Do not change anything else."
+   ```
+
+   Or via CLI:
+   ```sh
+   ojut --post-process
+   ```
+
+   You can customize the system prompt to modify how the LLM processes text. For example:
+
+   To clean up speech mistakes and improve readability:
+   ```yaml
+   llm_system_prompt: >
+     You are a transcription assistant. Your task is to:
+     1. Correct any speech errors, stutters, or mispronunciations
+     2. Add proper punctuation and capitalization
+     3. Improve grammar while preserving the original meaning
+     4. Remove filler words like "um", "uh", etc.
+     5. Format the text into clear, coherent sentences
+     Do not add any content that wasn't in the original transcript.
+   ```
+
+   For basic punctuation and formatting:
+   ```yaml
+   llm_system_prompt: >
+     Clean up the following transcript by adding punctuation and capitalization.
+     Do not change the wording or meaning of the text.
+   ```
+
+3. Optional environment variables:
+   ```sh
+   export OJUT_LLM_ENDPOINT="https://your-llm-endpoint"  # defaults to OpenAI (you can use any OpenAI compatible endpoint)
+   export OJUT_LLM_MODEL="gpt-4o"  # defaults to gpt-4o-mini
+   ```
+
 ### Dictionary
 
 You can also specify a personal dictionary in the config file. This is a list of words that are specific to you. Ojut will prompt the model to recognize these words. Here is an example of what that would look like:
