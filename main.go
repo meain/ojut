@@ -7,7 +7,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +18,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/micmonay/keybd_event"
@@ -68,8 +72,72 @@ func readConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
+func streamFromLLM(text string, kb keybd_event.KeyBonding) error {
+	apiKey := os.Getenv("OJUT_LLM_API_KEY")
+	if len(apiKey) == 0 {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+		if len(apiKey) == 0 {
+			return fmt.Errorf("neither OJUT_LLM_API_KEY nor OPENAI_API_KEY environment variables are set")
+		}
+	}
+
+	config := openai.DefaultConfig(apiKey)
+	if apiURL := os.Getenv("OJUT_LLM_ENDPOINT"); len(apiURL) > 0 {
+		config.BaseURL = apiURL
+	}
+
+	client := openai.NewClientWithConfig(config)
+
+	model := os.Getenv("OJUT_LLM_MODEL")
+	if len(model) == 0 {
+		model = "gpt-4"
+	}
+
+	stream, err := client.CreateChatCompletionStream(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "Cleanup the following transcript and add punctuation. Do not change anything else.",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: text,
+				},
+			},
+			Stream: true,
+		})
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	for {
+		response, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if len(response.Choices) > 0 {
+			content := response.Choices[0].Delta.Content
+			if len(content) > 0 {
+				err = pasteString(content, kb)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func overrideConfigWithCLIArgs(config *Config) *Config {
-	// Create a new Config to hold the CLI arguments
 	cliConfig := &Config{}
 
 	flag.StringVar(
@@ -210,10 +278,9 @@ func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error
 		return nil
 	}
 
-	// err = typeString(text, kb)
-	err = pasteString(text, kb)
+	err = streamFromLLM(text, kb)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to type: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to stream from LLM: %s\n", err)
 	}
 
 	return nil

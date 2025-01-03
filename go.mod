@@ -19,6 +19,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/sashabaranov/go-openai v1.36.1 // indirect
 	golang.design/x/mainthread v0.3.0 // indirect
 	golang.org/x/exp/shiny v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/image v0.14.0 // indirect
