@@ -2,6 +2,25 @@
 
 **Voice dictation using Whisper models.**
 
+## Features
+
+- 🎙️ Voice-to-text transcription using Whisper models
+- ⌨️ Automatic typing of transcribed text into any application
+- 🔥 Hotkey-triggered recording (Ctrl+Alt+Cmd+U)
+- 🧠 Optional LLM post-processing for:
+  - Punctuation and capitalization
+  - Grammar correction
+  - Speech error cleanup (stutters, filler words, etc.)
+  - Customizable via system prompts
+- 📚 Personal dictionary support for specialized vocabulary
+- 🛠️ Configurable via:
+  - YAML config file
+  - CLI arguments
+  - Environment variables
+- 🤖 Supports multiple LLM providers (OpenAI-compatible APIs)
+- 🎧 Audio feedback for recording start/stop
+- 🧮 Dynamic noise floor calculation for better recording quality
+
 ## Usage
 
 Once you have the ojut server running in the background, here is what
