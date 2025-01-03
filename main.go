@@ -39,6 +39,12 @@ type Config struct {
 	// Your personal dictionary. This will be fed in as the initial
 	// prompt comma separated to force the model to use these words.
 	Dictionary []string `yaml:"dictionary" json:"dictionary"`
+
+	// Whether to post-process text with LLM
+	PostProcess bool `yaml:"post_process" json:"post_process"`
+
+	// System prompt for LLM text processing
+	LLMSystemPrompt string `yaml:"llm_system_prompt" json:"llm_system_prompt"`
 }
 
 func readConfigFromFile(filePath string) (*Config, error) {
@@ -72,7 +78,7 @@ func readConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func streamFromLLM(text string, kb keybd_event.KeyBonding) error {
+func streamFromLLM(text, systemPrompt string, kb keybd_event.KeyBonding) error {
 	apiKey := os.Getenv("OJUT_LLM_API_KEY")
 	if len(apiKey) == 0 {
 		apiKey = os.Getenv("OPENAI_API_KEY")
@@ -81,16 +87,16 @@ func streamFromLLM(text string, kb keybd_event.KeyBonding) error {
 		}
 	}
 
-	config := openai.DefaultConfig(apiKey)
+	llmConfig := openai.DefaultConfig(apiKey)
 	if apiURL := os.Getenv("OJUT_LLM_ENDPOINT"); len(apiURL) > 0 {
-		config.BaseURL = apiURL
+		llmConfig.BaseURL = apiURL
 	}
 
-	client := openai.NewClientWithConfig(config)
+	client := openai.NewClientWithConfig(llmConfig)
 
 	model := os.Getenv("OJUT_LLM_MODEL")
 	if len(model) == 0 {
-		model = "gpt-4"
+		model = "gpt-4o-mini"
 	}
 
 	stream, err := client.CreateChatCompletionStream(
@@ -100,7 +106,7 @@ func streamFromLLM(text string, kb keybd_event.KeyBonding) error {
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
-					Content: "Cleanup the following transcript and add punctuation. Do not change anything else.",
+					Content: systemPrompt,
 				},
 				{
 					Role:    openai.ChatMessageRoleUser,
@@ -143,12 +149,19 @@ func overrideConfigWithCLIArgs(config *Config) *Config {
 	flag.StringVar(
 		&cliConfig.Model, "model",
 		"", "Name of the whisper model to use")
+	flag.BoolVar(
+		&cliConfig.PostProcess, "post-process",
+		false, "Whether to post-process text with LLM")
 
 	flag.Parse()
 
 	// Override config with CLI args only if they are set
 	if cliConfig.Model != "" {
 		config.Model = cliConfig.Model
+	}
+
+	if cliConfig.PostProcess {
+		config.PostProcess = cliConfig.PostProcess
 	}
 
 	return config
@@ -274,13 +287,26 @@ func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error
 
 	// This is how whisper represents blank audio. Skip it, it
 	// there is nothing.
-	if text == "[BLANK_AUDIO]" {
+	if text == "[BLANK_AUDIO]" || len(text) == 0 {
 		return nil
 	}
 
-	err = streamFromLLM(text, kb)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to stream from LLM: %s\n", err)
+	if config.PostProcess {
+		// Use default system prompt if none provided
+		systemPrompt := config.LLMSystemPrompt
+		if len(systemPrompt) == 0 {
+			systemPrompt = "Cleanup the following transcript and add punctuation. Do not change anything else."
+		}
+
+		err = streamFromLLM(text, systemPrompt, kb)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to stream from LLM: %s\n", err)
+		}
+	} else {
+		err = pasteString(text, kb)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to paste text: %s\n", err)
+		}
 	}
 
 	return nil
