@@ -36,10 +36,6 @@ type Config struct {
 	// Name of the whisper model to use
 	Model string `yaml:"model" json:"model"`
 
-	// Your personal dictionary. This will be fed in as the initial
-	// prompt comma separated to force the model to use these words.
-	Dictionary []string `yaml:"dictionary" json:"dictionary"`
-
 	// Whether to post-process text with LLM
 	PostProcess bool `yaml:"post_process" json:"post_process"`
 
@@ -51,6 +47,36 @@ type Config struct {
 
 	// Base URL for LLM API
 	LLMBaseURL string `yaml:"llm_base_url" json:"llm_base_url"`
+}
+
+func readDictionaryFile(filePath string) ([]string, error) {
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return []string{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var words []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) > 0 {
+			words = append(words, trimmed)
+		}
+	}
+	return words, nil
 }
 
 func readConfigFromFile(filePath string) (*Config, error) {
@@ -238,12 +264,18 @@ func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error
 	// Clear needed here as we print out noise floor data
 	fmt.Fprintf(os.Stderr, "\x1b[2K\r"+"Processing...\r")
 
-	initialPrompt := strings.Join(config.Dictionary, ", ")
+	// Read dictionary from file if it exists
+	dictPath := filepath.Join(os.Getenv("HOME"), ".config", "ojut", "dictionary")
+	dictionary, err := readDictionaryFile(dictPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error reading dictionary file: %w", err)
+	}
+	initialPrompt := strings.Join(dictionary, ", ")
 
 	var combinedBuffer bytes.Buffer
 	header := createWAVHeader(uint32(audioBuffer.Len()))
 
-	err := binary.Write(&combinedBuffer, binary.LittleEndian, header)
+	err = binary.Write(&combinedBuffer, binary.LittleEndian, header)
 	if err != nil {
 		return err
 	}

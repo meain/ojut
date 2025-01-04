@@ -99,16 +99,18 @@ better formatting and punctuation. This feature requires:
 
 ### Dictionary
 
-You can also specify a personal dictionary in the config file. This is a list of words that are specific to you. Ojut will prompt the model to recognize these words. Here is an example of what that would look like:
+You can specify a personal dictionary in a separate text file. Each line should contain one word or phrase that you want the model to recognize. The dictionary file should be located at `~/.config/ojut/dictionary`.
 
-```yaml
-dictionary:
-  - Ojut
-  - Golang
-  - meain
+Example dictionary:
+```
+Ojut
+Golang
+meain
+Technical terms
+Company names
 ```
 
-Note that you have to restart the server for this to take effect.
+Note that you have to restart the server for changes to take effect.
 
 Here is what the config file looks like:
 
