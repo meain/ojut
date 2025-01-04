@@ -45,6 +45,12 @@ type Config struct {
 
 	// System prompt for LLM text processing
 	LLMSystemPrompt string `yaml:"llm_system_prompt" json:"llm_system_prompt"`
+
+	// LLM model name for post-processing
+	LLMModel string `yaml:"llm_model" json:"llm_model"`
+
+	// Base URL for LLM API
+	LLMBaseURL string `yaml:"llm_base_url" json:"llm_base_url"`
 }
 
 func readConfigFromFile(filePath string) (*Config, error) {
@@ -78,26 +84,13 @@ func readConfigFromFile(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func streamFromLLM(text, systemPrompt string, kb keybd_event.KeyBonding) error {
-	apiKey := os.Getenv("OJUT_LLM_API_KEY")
-	if len(apiKey) == 0 {
-		apiKey = os.Getenv("OPENAI_API_KEY")
-		if len(apiKey) == 0 {
-			return fmt.Errorf("neither OJUT_LLM_API_KEY nor OPENAI_API_KEY environment variables are set")
-		}
-	}
-
-	llmConfig := openai.DefaultConfig(apiKey)
-	if apiURL := os.Getenv("OJUT_LLM_ENDPOINT"); len(apiURL) > 0 {
-		llmConfig.BaseURL = apiURL
-	}
-
+func streamFromLLM(
+	text, systemPrompt string,
+	kb keybd_event.KeyBonding,
+	llmConfig openai.ClientConfig,
+	model string,
+) error {
 	client := openai.NewClientWithConfig(llmConfig)
-
-	model := os.Getenv("OJUT_LLM_MODEL")
-	if len(model) == 0 {
-		model = "gpt-4o-mini"
-	}
 
 	stream, err := client.CreateChatCompletionStream(
 		context.Background(),
@@ -149,6 +142,12 @@ func overrideConfigWithCLIArgs(config *Config) *Config {
 	flag.StringVar(
 		&cliConfig.Model, "model",
 		"", "Name of the whisper model to use")
+	flag.StringVar(
+		&cliConfig.LLMModel, "llm-model",
+		"", "Name of the LLM model to use for post-processing")
+	flag.StringVar(
+		&cliConfig.LLMBaseURL, "llm-base-url",
+		"", "Base URL for LLM API")
 	flag.BoolVar(
 		&cliConfig.PostProcess, "post-process",
 		false, "Whether to post-process text with LLM")
@@ -162,6 +161,12 @@ func overrideConfigWithCLIArgs(config *Config) *Config {
 
 	if cliConfig.PostProcess {
 		config.PostProcess = cliConfig.PostProcess
+	}
+	if cliConfig.LLMModel != "" {
+		config.LLMModel = cliConfig.LLMModel
+	}
+	if cliConfig.LLMBaseURL != "" {
+		config.LLMBaseURL = cliConfig.LLMBaseURL
 	}
 
 	return config
@@ -298,7 +303,34 @@ func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error
 			systemPrompt = "Cleanup the following transcript and add punctuation. Do not change anything else."
 		}
 
-		err = streamFromLLM(text, systemPrompt, kb)
+		// Create LLM config
+		apiKey := os.Getenv("OJUT_LLM_API_KEY")
+		if len(apiKey) == 0 {
+			apiKey = os.Getenv("OPENAI_API_KEY")
+			if len(apiKey) == 0 {
+				return fmt.Errorf("neither OJUT_LLM_API_KEY nor OPENAI_API_KEY environment variables are set")
+			}
+		}
+
+		llmConfig := openai.DefaultConfig(apiKey)
+
+		// Use configured base URL if available, otherwise check env var
+		if config.LLMBaseURL != "" {
+			llmConfig.BaseURL = config.LLMBaseURL
+		} else if apiURL := os.Getenv("OJUT_LLM_ENDPOINT"); len(apiURL) > 0 {
+			llmConfig.BaseURL = apiURL
+		}
+
+		// Get LLM model name
+		model := config.LLMModel
+		if len(model) == 0 {
+			model = os.Getenv("OJUT_LLM_MODEL")
+			if len(model) == 0 {
+				model = "gpt-4o-mini"
+			}
+		}
+
+		err = streamFromLLM(text, systemPrompt, kb, llmConfig, model)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to stream from LLM: %s\n", err)
 		}

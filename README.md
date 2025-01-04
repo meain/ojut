@@ -81,7 +81,17 @@ better formatting and punctuation. This feature requires:
      Do not change the wording or meaning of the text.
    ```
 
-3. Optional environment variables:
+3. Configuration options:
+   - In config file:
+     ```yaml
+     llm_model: "gpt-4o"  # Model name
+     llm_base_url: "https://your-llm-endpoint"  # API endpoint
+     ```
+   - Via CLI:
+     ```sh
+     ojut --llm-model "gpt-4o" --llm-base-url "https://your-llm-endpoint"
+     ```
+   - Environment variables:
    ```sh
    export OJUT_LLM_ENDPOINT="https://your-llm-endpoint"  # defaults to OpenAI (you can use any OpenAI compatible endpoint)
    export OJUT_LLM_MODEL="gpt-4o"  # defaults to gpt-4o-mini
