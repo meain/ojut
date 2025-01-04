@@ -19,7 +19,6 @@
   - Environment variables
 - 🤖 Supports multiple LLM providers (OpenAI-compatible APIs)
 - 🎧 Audio feedback for recording start/stop
-- 🧮 Dynamic noise floor calculation for better recording quality
 
 ## Usage
 
