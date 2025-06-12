@@ -30,7 +30,7 @@ import (
 
 const sampleRate = 16000     // needed for whisper
 const windowSize = 2 * 16000 // 2 second window for noise floor calculation
-const whisperBinary = "whisper-cpp"
+const whisperBinary = "whisper-cli"
 
 type Config struct {
 	// Name of the whisper model to use
