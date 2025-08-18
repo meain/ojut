@@ -30,7 +30,12 @@ import (
 
 const sampleRate = 16000     // needed for whisper
 const windowSize = 2 * 16000 // 2 second window for noise floor calculation
-const whisperBinary = "whisper-cli"
+var whisperBinary = func() string {
+	if binary := os.Getenv("OJUT_WHISPER_BINARY"); binary != "" {
+		return binary
+	}
+	return "whisper-cli"
+}()
 
 type Config struct {
 	// Name of the whisper model to use
