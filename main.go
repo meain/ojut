@@ -252,13 +252,13 @@ func fn() {
 	fmt.Println("Model:", strings.TrimSuffix(filepath.Base(modelFile), ".bin"))
 
 	for {
-		if err := runLoop(config, hk, kb); err != nil {
+		if err := runLoop(config, hk, kb, modelFile); err != nil {
 			log.Fatal(err)
 		}
 	}
 }
 
-func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error {
+func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding, modelFile string) error {
 	<-hk.Keydown()
 	go playAudio()
 
@@ -293,9 +293,10 @@ func runLoop(config *Config, hk *hotkey.Hotkey, kb keybd_event.KeyBonding) error
 	cmd := exec.Command(
 		whisperBinary,
 		"-m",
-		config.Model,
+		modelFile,
 		"-f",
 		"-",
+		"-otxt",
 		"-np",
 		"-nt",
 		"--prompt",
