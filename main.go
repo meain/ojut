@@ -169,6 +169,7 @@ func streamFromLLM(
 
 func overrideConfigWithCLIArgs(config *Config) *Config {
 	cliConfig := &Config{}
+	var listModelsFlag bool
 
 	flag.StringVar(
 		&cliConfig.Model, "model",
@@ -182,8 +183,20 @@ func overrideConfigWithCLIArgs(config *Config) *Config {
 	flag.BoolVar(
 		&cliConfig.PostProcess, "post-process",
 		false, "Whether to post-process text with LLM")
+	flag.BoolVar(
+		&listModelsFlag, "list-models",
+		false, "List available models and exit")
 
 	flag.Parse()
+
+	// Handle list-models flag
+	if listModelsFlag {
+		if err := listModels(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error listing models: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	// Override config with CLI args only if they are set
 	if cliConfig.Model != "" {

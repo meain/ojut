@@ -92,6 +92,42 @@ func selectModel(modelName string) (string, error) {
 	}
 }
 
+func listModels() error {
+	var models map[string]modelInfo
+	err := json.Unmarshal(modelsJSON, &models)
+	if err != nil {
+		return err
+	}
+
+	cachedModels := make(map[string]struct{})
+	if _, err := os.Stat(cacheFolder); err == nil {
+		files, err := os.ReadDir(cacheFolder)
+		if err != nil {
+			return err
+		}
+
+		for _, file := range files {
+			cachedModels[strings.TrimSuffix(file.Name(), ".bin")] = struct{}{}
+		}
+	}
+
+	modelList := make([]string, 0, len(models))
+	for key := range models {
+		modelList = append(modelList, key)
+	}
+	slices.Sort(modelList)
+
+	for _, key := range modelList {
+		marker := ""
+		if _, found := cachedModels[key]; found {
+			marker = " [cached]"
+		}
+		fmt.Printf("%s [%s]%s\n", key, models[key].Size, marker)
+	}
+
+	return nil
+}
+
 func downloadModel(model string) (string, error) {
 	url := fmt.Sprintf(downloadURLFormat, model)
 	modelFilePath := filepath.Join(cacheFolder, fmt.Sprintf("%s.bin", model))

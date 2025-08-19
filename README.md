@@ -134,6 +134,8 @@ FYI, the [models](https://keyboard.futo.org/voice-input-models) used in [FUTO ke
 
 _You can specify model as empty `ojut -model ""` to show a picker._
 
+_You can list all available models with `ojut -list-models` to see which ones are available and which are cached locally._
+
 ## Installation
 
 > You also could run via the nix flake using `nix run github:meain/ojut`
